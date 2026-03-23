@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum ToolStatus {
+  PENDING
+  PUBLISHED
+  OFFLINE
+}
+
+enum AuditAction {
+  APPROVE
+  REJECT
+  OFFLINE
+  REVIVE
+  EDIT
+}
+
+enum AdStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+// ─── Category & Tag ──────────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?  @default("")
+  iconEmoji   String?  @default("")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tools       Tool[]
+
+  @@index([slug])
+}
+
+model Tag {
+  id    String    @id @default(cuid())
+  name  String    @unique
+  slug  String    @unique
+  tools ToolTag[]
+
+  @@index([slug])
+}
+
+// ─── Tool ────────────────────────────────────────────────────────────────────
+
+model Tool {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String     @db.Text
+  url         String
+  iconUrl     String?    @default("")
+  status      ToolStatus @default(PENDING)
+  isClaw      Boolean    @default(false)
+  hotScore    Float      @default(0)
+  viewCount   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id])
+  tags        ToolTag[]
+  auditLogs   AuditLog[]
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([isClaw])
+  @@index([hotScore(sort: Desc)])
+  @@index([updatedAt(sort: Desc)])
+}
+
+model ToolTag {
+  toolId String
+  tagId  String
+  tool   Tool   @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([toolId, tagId])
+}
+
+// ─── Audit Log ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  toolId    String
+  action    AuditAction
+  operator  String      @default("system")
+  note      String?     @default("")
+  createdAt DateTime    @default(now())
+  tool      Tool        @relation(fields: [toolId], references: [id], onDelete: Cascade)
+
+  @@index([toolId])
+  @@index([createdAt(sort: Desc)])
+}
+
+// ─── Daily Case ──────────────────────────────────────────────────────────────
+
+model DailyCase {
+  id              String   @id @default(cuid())
+  title           String
+  summary         String   @db.Text
+  scenario        String
+  prompt          String   @db.Text
+  outputSample    String   @db.Text
+  steps           String[] @default([])
+  relatedToolSlugs String[] @default([])
+  riskNote        String?  @default("")
+  isPinned        Boolean  @default(false)
+  publishedAt     DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([scenario])
+}
+
+// ─── Ads ─────────────────────────────────────────────────────────────────────
+
+model AdSlot {
+  id        String        @id @default(cuid())
+  code      String        @unique
+  name      String
+  enabled   Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  ads       Ad[]
+}
+
+model Ad {
+  id          String   @id @default(cuid())
+  slotId      String
+  title       String
+  imageUrl    String?  @default("")
+  linkUrl     String
+  advertiser  String
+  status      AdStatus @default(DRAFT)
+  startDate   DateTime
+  endDate     DateTime
+  maxImprDay  Int      @default(10000)
+  maxImprUser Int      @default(5)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  slot        AdSlot   @relation(fields: [slotId], references: [id])
+
+  @@index([slotId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+// ─── API Call Log ────────────────────────────────────────────────────────────
+
+model ApiCallLog {
+  id         String   @id @default(cuid())
+  apiKey     String
+  endpoint   String
+  method     String   @default("GET")
+  statusCode Int
+  latencyMs  Int
+  ipHash     String?  @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([apiKey])
+  @@index([createdAt(sort: Desc)])
+}
+
+// ─── Webhook Subscription ────────────────────────────────────────────────────
+
+model WebhookSubscription {
+  id         String   @id @default(cuid())
+  targetUrl  String
+  events     String[]
+  secret     String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
