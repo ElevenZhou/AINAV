@@ -12,10 +12,37 @@ export class SearchService {
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
+    const meiliApiKey =
+      this.config.get<string>('MEILI_API_KEY') ??
+      this.config.get<string>('MEILI_MASTER_KEY', '');
+
     this.meili = new MeiliSearch({
       host: this.config.get<string>('MEILI_HOST', 'http://localhost:7700'),
-      apiKey: this.config.get<string>('MEILI_MASTER_KEY', ''),
+      apiKey: meiliApiKey,
     });
+  }
+
+  private mapToolDoc(tool: any) {
+    return {
+      id: tool.id,
+      name: tool.name,
+      slug: tool.slug,
+      description: tool.description,
+      searchText: tool.searchText,
+      category: tool.category.name,
+      categorySlug: tool.category.slug,
+      tags: tool.tags.map((tt: any) => tt.tag.name),
+      isClaw: tool.isClaw,
+      hotScore: tool.hotScore,
+      status: tool.status,
+    };
+  }
+
+  private async ensureToolsIndexSettings() {
+    const index = this.meili.index('tools');
+    await index.updateSearchableAttributes(['name', 'description', 'searchText', 'category', 'tags']);
+    await index.updateFilterableAttributes(['status', 'categorySlug', 'isClaw']);
+    await index.updateSortableAttributes(['hotScore']);
   }
 
   async search(q: string, page = 1, limit = 20) {
@@ -64,21 +91,20 @@ export class SearchService {
       include: { category: true, tags: { include: { tag: true } } },
     });
     if (!tool) return;
-    const doc = {
-      id: tool.id,
-      name: tool.name,
-      slug: tool.slug,
-      description: tool.description,
-      category: tool.category.name,
-      categorySlug: tool.category.slug,
-      tags: tool.tags.map((tt) => tt.tag.name),
-      isClaw: tool.isClaw,
-      hotScore: tool.hotScore,
-      status: tool.status,
-    };
+    const doc = this.mapToolDoc(tool);
     try {
+      await this.ensureToolsIndexSettings();
       await this.meili.index('tools').addDocuments([doc]);
     } catch { /* ignore if meili down */ }
+  }
+
+  async removeToolFromIndex(toolId: string) {
+    try {
+      await this.meili.index('tools').deleteDocument(toolId);
+      return { removed: 1 };
+    } catch {
+      return { removed: 0 };
+    }
   }
 
   async syncAllTools() {
@@ -86,18 +112,9 @@ export class SearchService {
       where: { status: ToolStatus.PUBLISHED },
       include: { category: true, tags: { include: { tag: true } } },
     });
-    const docs = tools.map((tool) => ({
-      id: tool.id,
-      name: tool.name,
-      slug: tool.slug,
-      description: tool.description,
-      category: tool.category.name,
-      categorySlug: tool.category.slug,
-      tags: tool.tags.map((tt) => tt.tag.name),
-      isClaw: tool.isClaw,
-      hotScore: tool.hotScore,
-    }));
+    const docs = tools.map((tool) => this.mapToolDoc(tool));
     try {
+      await this.ensureToolsIndexSettings();
       await this.meili.index('tools').addDocuments(docs);
       return { synced: docs.length };
     } catch (e) {

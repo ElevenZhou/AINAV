@@ -12,6 +12,9 @@
     "build:web": "npm run build -w apps/web",
     "build:api": "npm run build -w apps/api",
     "lint:web": "npm run lint -w apps/web",
+    "check:regression:win": "powershell -ExecutionPolicy Bypass -File scripts/regression-check.ps1",
+    "bootstrap:db:win": "powershell -ExecutionPolicy Bypass -File scripts/bootstrap-db-meili.ps1",
+    "stop:local": "powershell -ExecutionPolicy Bypass -File scripts/stop-local.ps1",
     "start:infra": "docker compose -f infra/docker-compose.yml up -d",
     "stop:infra": "docker compose -f infra/docker-compose.yml down"
   }

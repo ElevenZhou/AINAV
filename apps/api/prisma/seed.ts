@@ -1,4 +1,31 @@
-import { PrismaClient, ToolStatus, AdStatus } from '@prisma/client';
+import { PrismaClient, ToolStatus, AdStatus, Role } from '@prisma/client';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
+
+function loadEnvForSeed() {
+  const candidates = [
+    resolve(process.cwd(), '.env'),
+    resolve(process.cwd(), '../../.env'),
+    resolve(process.cwd(), '../../.env.example'),
+    resolve(__dirname, '../../../.env'),
+    resolve(__dirname, '../../../.env.example'),
+  ];
+
+  const envFile = candidates.find((file) => existsSync(file));
+  if (!envFile) return;
+
+  const lines = readFileSync(envFile, 'utf8').split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const [key, ...rest] = line.split('=');
+    if (!key || rest.length === 0) continue;
+    if (process.env[key] !== undefined) continue;
+    process.env[key] = rest.join('=').trim();
+  }
+}
+
+loadEnvForSeed();
 
 const prisma = new PrismaClient();
 
@@ -85,6 +112,7 @@ async function main() {
       update: {},
       create: {
         ...rest,
+        searchText: [rest.name, rest.description, cat.name, ...tagNames].join(' '),
         hotScore: rest.hotScore ?? 0,
         status: ToolStatus.PUBLISHED,
         categoryId: cat.id,
@@ -242,6 +270,21 @@ async function main() {
     }
   }
   console.log(`✅ ${slots.length} ad slots seeded`);
+
+  // ── Default admin user ───────────────────────────────────────────
+  const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@ainav.local';
+  await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: { role: Role.ADMIN, isActive: true },
+    create: {
+      email: adminEmail,
+      displayName: 'Default Admin',
+      role: Role.ADMIN,
+      passwordHash: process.env.ADMIN_PASSWORD_HASH ?? '',
+      isActive: true,
+    },
+  });
+  console.log(`✅ default admin ready: ${adminEmail}`);
 
   console.log('🎉 Seed completed!');
 }

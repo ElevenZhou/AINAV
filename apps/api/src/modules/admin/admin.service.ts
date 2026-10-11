@@ -40,11 +40,13 @@ export class AdminService {
 
   async createTool(data: any, operator = 'admin') {
     const tool = await this.tools.createTool(data, operator);
+    await this.search.syncToolToIndex(tool.id);
     return tool;
   }
 
   async updateTool(id: string, data: any, operator = 'admin') {
     const tool = await this.tools.updateTool(id, data, operator);
+    await this.search.syncToolToIndex(id);
     return tool;
   }
 
@@ -56,11 +58,15 @@ export class AdminService {
   }
 
   async rejectTool(id: string, note = '', operator = 'admin') {
-    return this.tools.setStatus(id, ToolStatus.OFFLINE, note, operator);
+    const tool = await this.tools.setStatus(id, ToolStatus.OFFLINE, note, operator);
+    await this.search.removeToolFromIndex(id);
+    return tool;
   }
 
   async offlineTool(id: string, note = '', operator = 'admin') {
-    return this.tools.setStatus(id, ToolStatus.OFFLINE, note, operator);
+    const tool = await this.tools.setStatus(id, ToolStatus.OFFLINE, note, operator);
+    await this.search.removeToolFromIndex(id);
+    return tool;
   }
 
   // ── Cases ────────────────────────────────────────────────────────────

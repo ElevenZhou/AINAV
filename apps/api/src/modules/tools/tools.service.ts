@@ -7,6 +7,17 @@ import { CreateToolDto, UpdateToolDto, QueryToolDto } from './dto/tool.dto';
 export class ToolsService {
   constructor(private prisma: PrismaService) {}
 
+  private buildSearchText(input: {
+    name?: string;
+    description?: string;
+    categoryName?: string;
+    tags?: string[];
+  }) {
+    return [input.name, input.description, input.categoryName, ...(input.tags ?? [])]
+      .filter(Boolean)
+      .join(' ');
+  }
+
   async listTools(query: QueryToolDto) {
     const page = Number(query.page) || 1;
     const limit = Math.min(Number(query.limit) || 20, 100);
@@ -70,9 +81,19 @@ export class ToolsService {
 
   async createTool(dto: CreateToolDto, operator = 'system') {
     const { tags, ...data } = dto;
+    const category = await this.prisma.category.findUnique({ where: { id: data.categoryId } });
+    const tagRows = tags?.length
+      ? await this.prisma.tag.findMany({ where: { id: { in: tags } } })
+      : [];
     const tool = await this.prisma.tool.create({
       data: {
         ...data,
+        searchText: this.buildSearchText({
+          name: data.name,
+          description: data.description,
+          categoryName: category?.name,
+          tags: tagRows.map((t) => t.name),
+        }),
         tags: tags?.length
           ? { create: tags.map((tagId) => ({ tagId })) }
           : undefined,
@@ -87,10 +108,31 @@ export class ToolsService {
 
   async updateTool(id: string, dto: UpdateToolDto, operator = 'admin') {
     const { tags, ...data } = dto;
+    const current = await this.prisma.tool.findUnique({
+      where: { id },
+      include: { category: true, tags: { include: { tag: true } } },
+    });
+    if (!current) {
+      throw new NotFoundException('Tool not found');
+    }
+
+    const categoryName = data.categoryId
+      ? (await this.prisma.category.findUnique({ where: { id: data.categoryId } }))?.name
+      : current.category.name;
+    const tagNames = tags !== undefined
+      ? (await this.prisma.tag.findMany({ where: { id: { in: tags } } })).map((t) => t.name)
+      : current.tags.map((tt) => tt.tag.name);
+
     const tool = await this.prisma.tool.update({
       where: { id },
       data: {
         ...data,
+        searchText: this.buildSearchText({
+          name: data.name ?? current.name,
+          description: data.description ?? current.description,
+          categoryName,
+          tags: tagNames,
+        }),
         ...(tags !== undefined && {
           tags: {
             deleteMany: {},

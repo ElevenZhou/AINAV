@@ -4,13 +4,13 @@
   "version": "0.1.0",
   "scripts": {
     "start:dev": "nest start --watch",
-    "build": "nest build",
-    "start": "node dist/main.js",
+    "build": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\" && nest build",
+    "start": "node dist/src/main.js",
     "lint": "eslint \"src/**/*.ts\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:seed": "ts-node --project tsconfig.json -e \"require('ts-node/register'); require('./prisma/seed.ts')\"",
+    "prisma:seed": "ts-node --project tsconfig.json prisma/seed.ts",
     "db:setup": "prisma migrate deploy && prisma db seed"
   },
   "prisma": {

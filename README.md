@@ -43,16 +43,42 @@ cp .env.example .env
 npm run start:infra
 ```
 
-4. 启动 API
+4. 初始化数据库与搜索索引（Windows）
+
+```powershell
+npm run bootstrap:db:win
+```
+
+5. 启动 API
 
 ```bash
 npm run dev:api
 ```
 
-5. 启动 Web
+6. 启动 Web
 
 ```bash
 npm run dev:web
+```
+
+## 回归检查（Windows）
+
+```powershell
+# 全量：包含构建 + 启动 + 关键 API/页面探测
+npm run check:regression:win
+
+# 已手动启动基础设施时可跳过 infra
+powershell -ExecutionPolicy Bypass -File .\scripts\regression-check.ps1 -SkipInfraStartup
+```
+
+## 停止本地服务
+
+```powershell
+# 停止本地 3000/3001 端口服务
+npm run stop:local
+
+# 停止 Docker 基础设施
+npm run stop:infra
 ```
 
 ## 当前里程碑
@@ -60,6 +86,6 @@ npm run dev:web
 - [x] 项目骨架
 - [x] 模块化 API 占位接口
 - [x] 首页与频道入口占位
-- [ ] Prisma migration 与种子数据
-- [ ] 管理后台 UI
+- [x] Prisma migration 与种子数据
+- [x] 管理后台 UI
 - [ ] 采集任务与审核流

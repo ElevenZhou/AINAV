@@ -30,6 +30,11 @@ enum AdStatus {
   ENDED
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 // ─── Category & Tag ──────────────────────────────────────────────────────────
 
 model Category {
@@ -68,6 +73,8 @@ model Tool {
   isClaw      Boolean    @default(false)
   hotScore    Float      @default(0)
   viewCount   Int        @default(0)
+  // Optional aggregated text field used for Meili / full-text sync
+  searchText  String?    @default("")
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   categoryId  String
@@ -80,6 +87,20 @@ model Tool {
   @@index([isClaw])
   @@index([hotScore(sort: Desc)])
   @@index([updatedAt(sort: Desc)])
+  @@index([name])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  displayName  String?  @default("")
+  role         Role     @default(USER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([email])
 }
 
 model ToolTag {

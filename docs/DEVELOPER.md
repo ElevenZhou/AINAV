@@ -117,10 +117,8 @@ cp .env.example .env
 npm run start:infra
 
 # 4. 初始化数据库（迁移 + 种子数据）
-# Windows:
-cd scripts && .\init-db.ps1
-# Linux/Mac:
-cd scripts && bash init-db.sh
+# Windows（包含 Prisma migrate + seed + 搜索索引同步）：
+npm run bootstrap:db:win
 
 # 5. 启动开发环境
 npm run dev:api    # 后端 http://localhost:3001
@@ -139,6 +137,8 @@ npm run dev:web    # 前端 http://localhost:3000
 | `MEILI_HOST` | `http://localhost:7700` | Meilisearch 地址 |
 | `MEILI_API_KEY` | `masterKey` | Meilisearch 主密钥 |
 | `ADMIN_SECRET` | `changeme-admin-2024` | 管理后台 `x-admin-key` 密钥 |
+| `ADMIN_EMAIL` | `admin@ainav.local` | 种子脚本创建默认管理员账号 |
+| `ADMIN_PASSWORD_HASH` | `<bcrypt-hash>` | 默认管理员密码哈希（可选） |
 | `AGENT_API_KEY` | `strong-random-key` | Agent API `x-api-key` 密钥 |
 | `WEBHOOK_SIGNING_SECRET` | `strong-random-secret` | Webhook 签名密钥 |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:3001/api/v1` | 前端调用 API 的基础路径 |
@@ -148,13 +148,14 @@ npm run dev:web    # 前端 http://localhost:3000
 
 ## 数据库
 
-### Prisma 数据模型（10 个）
+### Prisma 数据模型（11 个）
 
 | 模型 | 说明 |
 |------|------|
 | `Category` | 工具分类（8 个默认分类） |
 | `Tag` | 工具标签（免费/国产/开源等） |
 | `Tool` | 核心工具表，含 `isClaw`/`hotScore`/`status` |
+| `User` | 管理员/用户账号（角色：`USER` / `ADMIN`） |
 | `ToolTag` | 工具-标签多对多 |
 | `AuditLog` | 工具审核日志 |
 | `DailyCase` | 每日案例 |
@@ -333,6 +334,8 @@ npm run dev:api          # 启动后端开发服务器
 npm run build:web        # 构建前端
 npm run build:api        # 构建后端
 npm run start:infra      # 启动 Docker 基础设施
+npm run check:regression:win  # Windows 一键回归检查
+npm run stop:local       # 停止 3000/3001 本地服务
 
 # apps/api
 cd apps/api
@@ -347,6 +350,25 @@ cd apps/web
 npm run build            # Next.js 生产构建验证
 npm run lint             # ESLint 检查
 ```
+
+### 回归脚本常用参数（Windows）
+
+```powershell
+# 跳过 infra 启动（本机已有数据库/搜索服务时）
+powershell -ExecutionPolicy Bypass -File .\scripts\regression-check.ps1 -SkipInfraStartup
+
+# 跳过构建（仅做可达性）
+powershell -ExecutionPolicy Bypass -File .\scripts\regression-check.ps1 -SkipBuild
+
+# 检查后保留服务运行
+powershell -ExecutionPolicy Bypass -File .\scripts\regression-check.ps1 -KeepRunning
+```
+
+### 常见报错排查
+
+- `Docker command not found`：未安装 Docker Desktop。安装后重试，或使用 `-SkipInfraStartup` 并确保本地 PostgreSQL 已启动。
+- `Database is not reachable on localhost:5432`：数据库未启动。执行 `npm run start:infra` 或启动本地 PostgreSQL。
+- `DATABASE_URL is not configured`：检查根目录 `.env`（脚本会在 `.env` 缺失时临时回退读取 `.env.example`）。
 
 ---
 
